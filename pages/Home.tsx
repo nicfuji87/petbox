@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Logo } from '../components/Logo';
+import petboxVideo from '../assets/videos/petbox_video_1.mp4';
 
 // Testimonials data
 const TESTIMONIALS = [
@@ -170,32 +171,27 @@ const Home: React.FC = () => {
         </div>
 
         <div className="flex flex-col md:flex-row gap-10 md:gap-16 items-center justify-center">
-          {/* Vertical Video Placeholder (Reels Style) */}
+          {/* Vertical Video (Reels Style) */}
           <div className="relative w-[280px] md:w-[320px] aspect-[9/16] shrink-0 rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white dark:border-surface-dark bg-black group md:-rotate-2 hover:rotate-0 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10">
             {/* Phone Notch/Header Mockup (Optional aesthetic detail) */}
             <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-black/40 to-transparent z-20 pointer-events-none"></div>
 
-            <img
-              src="https://images.unsplash.com/photo-1548681528-6a5c45b6c342?q=80&w=1974&auto=format&fit=crop"
-              alt="Vertical Pet Box Unboxing"
-              className="absolute inset-0 w-full h-full object-cover opacity-95 transition-transform duration-700 group-hover:scale-110"
+            <video
+              src={petboxVideo}
+              controls
+              loop
+              playsInline
+              poster="https://images.unsplash.com/photo-1548681528-6a5c45b6c342?q=80&w=1974&auto=format&fit=crop"
+              className="absolute inset-0 w-full h-full object-cover"
             />
 
-            {/* Play Overlay */}
-            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors flex items-center justify-center cursor-pointer z-10">
-              <button className="size-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-2xl transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:border-primary animate-pulse group-hover:animate-none">
-                <span className="material-symbols-outlined text-white text-4xl ml-1">play_arrow</span>
-              </button>
-            </div>
-
             {/* Reels UI Elements Mockup */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white z-20">
+            <div className="absolute bottom-16 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white z-10 pointer-events-none">
               <div className="flex items-center gap-2 mb-3">
                 <div className="size-8 rounded-full bg-primary flex items-center justify-center">
                   <span className="material-symbols-outlined text-sm">pets</span>
                 </div>
                 <span className="font-bold text-sm">@petbox</span>
-                <button className="text-[10px] font-bold border border-white/30 px-2 py-0.5 rounded-full backdrop-blur-sm">Seguir</button>
               </div>
               <p className="text-sm font-medium leading-snug mb-2">A reação do Thor recebendo a caixa desse mês é impagável! 🧡 📦 #petbox #felicidade</p>
             </div>
