@@ -1,0 +1,5 @@
+{
+  "name": "Pet Box",
+  "description": "A subscription service for pet toys and treats, featuring a personalization flow and admin dashboard.",
+  "requestFramePermissions": []
+}
