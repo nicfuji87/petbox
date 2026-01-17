@@ -1,114 +1,242 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MOCK_PETS } from '../../constants';
-import { Pet } from '../../types';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../src/lib/supabase';
 
-const PetList: React.FC = () => {
+// Filter options
+const FILTERS = ['Todos', 'Assinantes', 'Avulsos', 'Inativos', '🐕 Cães', '🐈 Gatos'];
+
+interface Pet {
+  id: string;
+  name: string;
+  image: string;
+  tutor: string;
+  type: string;
+  size: string;
+  status: string;
+  plan: string;
+  planType: string;
+}
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'bg-primary';
+    case 'oneoff':
+      return 'bg-blue-400';
+    case 'inactive':
+      return 'bg-gray-400';
+    case 'pending':
+      return 'bg-red-500';
+    default:
+      return 'bg-gray-400';
+  }
+};
+
+const getPlanStyles = (planType: string) => {
+  switch (planType) {
+    case 'subscription':
+      return 'bg-primary/20 text-primary';
+    case 'oneoff':
+      return 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300';
+    case 'inactive':
+      return 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400';
+    case 'pending':
+      return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400';
+    default:
+      return 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400';
+  }
+};
+
+const PetListNew: React.FC = () => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<'all' | 'dog' | 'cat' | 'allergy'>('all');
-  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('Todos');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredPets = MOCK_PETS.filter(pet => {
-    const matchesSearch = pet.name.toLowerCase().includes(search.toLowerCase()) || pet.ownerName.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'all' 
-      ? true 
-      : filter === 'allergy' 
-        ? pet.allergies.length > 0 
-        : pet.species === filter;
-    return matchesSearch && matchesFilter;
+  React.useEffect(() => {
+    const fetchPets = async () => {
+      setIsLoading(true);
+      try {
+        const { data: petsData, error } = await supabase
+          .from('pets')
+          .select(`
+            *,
+            clients (
+              full_name
+            )
+          `);
+
+        if (error) throw error;
+
+        const formattedPets: Pet[] = (petsData || []).map((pet: any) => ({
+          id: pet.id,
+          name: pet.name,
+          image: pet.photo_url || `https://ui-avatars.com/api/?name=${pet.name}&background=random`,
+          tutor: pet.clients ? pet.clients.full_name : 'Sem Tutor',
+          type: pet.type === 'dog' ? 'Cão' : 'Gato',
+          size: pet.size || 'Médio',
+          status: pet.active ? 'active' : 'inactive',
+          plan: pet.plan_type || 'Avulso',
+          planType: pet.plan_type ? 'subscription' : 'oneoff',
+        }));
+
+        setPets(formattedPets);
+      } catch (error) {
+        console.error('Error fetching pets:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPets();
+  }, []);
+
+  const filteredPets = pets.filter((pet) => {
+    const matchesFilter =
+      activeFilter === 'Todos' ||
+      (activeFilter === 'Assinantes' && pet.planType === 'subscription') ||
+      (activeFilter === 'Avulsos' && pet.planType === 'oneoff') ||
+      (activeFilter === 'Inativos' && pet.planType === 'inactive') ||
+      (activeFilter === '🐕 Cães' && pet.type === 'Cão') ||
+      (activeFilter === '🐈 Gatos' && pet.type === 'Gato');
+
+    const matchesSearch =
+      searchQuery === '' ||
+      pet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pet.tutor.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesFilter && matchesSearch;
   });
 
   return (
-    <div className="pb-24">
-      <header className="sticky top-0 z-30 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm px-4 pt-6 pb-2">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm text-gray-500 font-medium">Olá, Admin</p>
-            <h1 className="text-2xl font-bold leading-tight">Gerenciar Pets</h1>
-          </div>
-          <button className="relative p-2 rounded-full bg-surface-light dark:bg-surface-dark shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">notifications</span>
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-surface-dark"></span>
-          </button>
+    <div className="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col pb-20">
+      {/* Top App Bar */}
+      <div className="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-white/5 px-4 pt-12 pb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-text-main dark:text-white text-2xl font-bold tracking-tight">Gerenciar Pets</h1>
+          <p className="text-sm text-text-secondary dark:text-text-dark-secondary">Admin Dashboard</p>
         </div>
-        
-        {/* Search */}
-        <div className="relative w-full mb-4">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><span className="material-symbols-outlined text-primary">search</span></div>
-          <input 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="block w-full p-4 pl-12 text-sm border-none rounded-xl bg-surface-light dark:bg-surface-dark shadow-sm focus:ring-2 focus:ring-primary" 
-            placeholder="Buscar por pet ou tutor..." 
+        <button
+          aria-label="Adicionar Pet"
+          className="flex items-center justify-center bg-primary hover:bg-primary-hover text-white w-10 h-10 rounded-full shadow-lg transition-colors"
+        >
+          <span className="material-symbols-outlined font-semibold">add</span>
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="px-4 py-4">
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span className="material-symbols-outlined text-text-secondary dark:text-text-dark-secondary">search</span>
+          </div>
+          <input
+            className="block w-full pl-10 pr-3 py-3 rounded-xl border-none bg-surface-light dark:bg-surface-dark text-text-main dark:text-white placeholder-text-secondary dark:placeholder-text-dark-secondary/60 focus:ring-2 focus:ring-primary focus:bg-surface-light dark:focus:bg-surface-dark transition-all shadow-sm"
+            placeholder="Buscar por pet ou tutor..."
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-          {[
-            { id: 'all', label: 'Todos', icon: '' },
-            { id: 'dog', label: 'Cães', icon: 'pets' },
-            { id: 'cat', label: 'Gatos', icon: 'cruelty_free' },
-            { id: 'allergy', label: 'Com Alergia', icon: 'warning' }
-          ].map((f) => (
-            <button 
-              key={f.id}
-              onClick={() => setFilter(f.id as any)}
-              className={`flex items-center justify-center px-5 py-2 rounded-full text-sm font-medium shrink-0 transition-all ${
-                filter === f.id 
-                  ? 'bg-primary text-white shadow-md shadow-primary/30' 
-                  : 'bg-surface-light dark:bg-surface-dark text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+      {/* Filters (Chips) */}
+      <div className="flex overflow-x-auto gap-3 px-4 pb-2 no-scrollbar">
+        {FILTERS.map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setActiveFilter(filter)}
+            className={`flex shrink-0 items-center justify-center px-4 h-9 rounded-full text-sm transition-colors ${activeFilter === filter
+              ? 'bg-primary text-white font-semibold'
+              : 'bg-surface-light dark:bg-surface-dark border border-border-light dark:border-white/5 text-text-secondary dark:text-white font-medium whitespace-nowrap hover:bg-black/5 dark:hover:bg-white/5'
               }`}
-            >
-              {f.icon && <span className={`material-symbols-outlined text-base mr-1.5 ${f.id === 'allergy' ? 'filled text-red-400' : ''}`}>{f.icon}</span>}
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </header>
+          >
+            {filter}
+          </button>
+        ))}
+      </div>
 
-      <main className="px-4 py-2 space-y-4">
-        {filteredPets.map((pet) => (
-          <div 
-            key={pet.id} 
+      {/* Section Title */}
+      <div className="px-4 pt-4 pb-2 flex justify-between items-end">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary dark:text-text-dark-secondary">
+          Pets Cadastrados
+        </h2>
+        <span className="text-xs text-text-secondary/60 dark:text-text-dark-secondary/60">{filteredPets.length} total</span>
+      </div>
+
+      {/* Pet List */}
+      <div className="flex flex-col px-4 gap-3">
+        {isLoading ? (
+          <div className="flex justify-center p-8">
+            <span className="material-symbols-outlined animate-spin text-3xl text-primary">progress_activity</span>
+          </div>
+        ) : filteredPets.map((pet) => (
+          <div
+            key={pet.id}
             onClick={() => navigate(`/admin/pets/${pet.id}`)}
-            className="group relative flex items-center gap-4 bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer"
+            className="group flex items-center p-3 gap-4 bg-surface-light dark:bg-surface-dark rounded-2xl shadow-sm border border-transparent dark:border-white/5 active:scale-[0.99] transition-all cursor-pointer"
           >
             <div className="relative shrink-0">
-              <div className="h-16 w-16 rounded-full bg-cover bg-center border-2 border-white dark:border-gray-600 shadow-sm" style={{ backgroundImage: `url(${pet.imageUrl})` }}></div>
-              <div className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 border-surface-light dark:border-surface-dark ${pet.species === 'dog' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                <span className="material-symbols-outlined text-[14px] block">{pet.species === 'dog' ? 'pets' : 'cruelty_free'}</span>
-              </div>
+              <div
+                className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center"
+                style={{ backgroundImage: `url('${pet.image}')` }}
+              />
+              <div
+                className={`absolute bottom-0 right-0 w-4 h-4 rounded-full ${getStatusColor(pet.status)} border-2 border-surface-light dark:border-surface-dark`}
+                title={pet.plan}
+              />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <h3 className="text-lg font-bold truncate">{pet.name}</h3>
-                {pet.allergies.length > 0 && (
-                  <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 text-[10px] font-bold uppercase tracking-wide">
-                    <span className="material-symbols-outlined text-[12px] filled">warning</span> Alergia
-                  </span>
-                )}
+              <div className="flex justify-between items-start">
+                <h3 className="text-text-main dark:text-white text-lg font-bold truncate">{pet.name}</h3>
+                <span className={`${getPlanStyles(pet.planType)} text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide`}>
+                  {pet.plan}
+                </span>
               </div>
-              <p className="text-sm text-gray-500 truncate">Tutor: {pet.ownerName}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{pet.size}</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{pet.gender}</span>
+              <p className="text-text-secondary dark:text-text-dark-secondary text-sm truncate mb-0.5">Tutor: {pet.tutor}</p>
+              <div className="flex items-center gap-2 text-xs text-text-secondary/70 dark:text-text-dark-secondary/70">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">{pet.type === 'Cão' ? 'pets' : 'cruelty_free'}</span>
+                  {pet.type}
+                </span>
+                <span>•</span>
+                <span>{pet.size}</span>
               </div>
             </div>
-            <div className="shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-primary transition-colors">
+            <div className="shrink-0 text-text-secondary/50 dark:text-text-dark-secondary/50">
               <span className="material-symbols-outlined">chevron_right</span>
             </div>
           </div>
         ))}
-        {filteredPets.length === 0 && <div className="text-center py-10 text-gray-400">Nenhum pet encontrado</div>}
-      </main>
+      </div>
 
-      {/* FAB */}
-      <button className="fixed right-4 bottom-24 z-40 flex items-center justify-center w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-orange-500/40 hover:bg-orange-600 transition-colors active:scale-90">
-        <span className="material-symbols-outlined text-3xl">add</span>
-      </button>
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-light/90 dark:bg-background-dark/95 backdrop-blur-lg border-t border-border-light dark:border-white/5 pt-2 pb-6 px-6">
+        <div className="flex justify-between items-center">
+          <Link to="/admin" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
+            <span className="material-symbols-outlined text-2xl">dashboard</span>
+            <span className="text-[10px] font-medium">Início</span>
+          </Link>
+          <Link to="/admin/pets" className="flex flex-col items-center gap-1 text-primary">
+            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>pets</span>
+            <span className="text-[10px] font-bold">Pets</span>
+          </Link>
+          <Link to="/admin/orders" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
+            <span className="material-symbols-outlined text-2xl">package_2</span>
+            <span className="text-[10px] font-medium">Box</span>
+          </Link>
+          <Link to="/admin/settings" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
+            <span className="material-symbols-outlined text-2xl">person</span>
+            <span className="text-[10px] font-medium">Perfil</span>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Gradient Overlay */}
+      <div className="fixed bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none z-10"></div>
     </div>
   );
 };
 
-export default PetList;
+export default PetListNew;
