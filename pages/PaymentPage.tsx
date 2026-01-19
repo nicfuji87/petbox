@@ -10,6 +10,7 @@ interface PaymentState {
     clientPhone: string;
     asaasCustomerId: string;
     petId?: string;
+    productId?: string;
     productType: 'subscription' | 'one_time';
     productName: string;
     productValue: number;
@@ -72,6 +73,7 @@ const PaymentPage: React.FC = () => {
                 body: {
                     clientId: paymentData.clientId,
                     petId: paymentData.petId,
+                    productId: paymentData.productId,
                     asaasCustomerId: paymentData.asaasCustomerId,
                     value: finalValue,
                     description: paymentData.productName,
@@ -140,6 +142,7 @@ const PaymentPage: React.FC = () => {
                     body: {
                         clientId: paymentData.clientId,
                         petId: paymentData.petId,
+                        productId: paymentData.productId,
                         asaasCustomerId: paymentData.asaasCustomerId,
                         value: finalValue,
                         cycle: paymentData.billingCycle || 'MONTHLY',
@@ -156,6 +159,7 @@ const PaymentPage: React.FC = () => {
                     body: {
                         clientId: paymentData.clientId,
                         petId: paymentData.petId,
+                        productId: paymentData.productId,
                         asaasCustomerId: paymentData.asaasCustomerId,
                         value: finalValue,
                         description: paymentData.productName,
@@ -264,8 +268,8 @@ const PaymentPage: React.FC = () => {
                             <button
                                 onClick={() => setPaymentMethod('credit_card')}
                                 className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${paymentMethod === 'credit_card'
-                                        ? 'border-primary bg-primary/10'
-                                        : 'border-border-light dark:border-white/10'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border-light dark:border-white/10'
                                     }`}
                             >
                                 <span className="material-symbols-outlined text-2xl">credit_card</span>
@@ -274,8 +278,8 @@ const PaymentPage: React.FC = () => {
                             <button
                                 onClick={() => setPaymentMethod('pix')}
                                 className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${paymentMethod === 'pix'
-                                        ? 'border-primary bg-primary/10'
-                                        : 'border-border-light dark:border-white/10'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border-light dark:border-white/10'
                                     }`}
                             >
                                 <span className="material-symbols-outlined text-2xl">qr_code_2</span>

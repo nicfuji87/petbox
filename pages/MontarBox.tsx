@@ -293,6 +293,7 @@ const MontarBox: React.FC = () => {
                 clientPhone: clientData.clientPhone,
                 asaasCustomerId: clientData.asaasCustomerId,
                 petId: clientData.petId,
+                productId: selectedProduct?.productId || null,
                 productType: selectedProduct?.isSubscription ? 'subscription' : 'one_time',
                 productName: selectedProduct?.name || '',
                 productValue: selectedProduct?.value || 0,
