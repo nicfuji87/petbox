@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../src/lib/supabase';
 import AddCustomerModal from '../../components/admin/AddCustomerModal';
+import AdminBottomNav from '../../components/admin/AdminBottomNav';
 
 // Filter options
 const FILTERS = ['Todos', 'Ativos', 'Cancelados', 'Novos', 'VIP'];
@@ -53,16 +54,24 @@ const CustomerList: React.FC = () => {
 
             if (error) throw error;
 
-            const formattedCustomers: Customer[] = (clients || []).map((client: any) => ({
-                id: client.id,
-                name: client.full_name,
-                image: `https://ui-avatars.com/api/?name=${client.full_name}&background=random`, // Placeholder image
-                pet: client.pets && client.pets[0] ? client.pets[0].name : 'Sem Pet',
-                status: client.status || 'new', // Default status if null
-                statusLabel: client.status === 'active' ? 'Ativo' : client.status === 'inactive' ? 'Inativo' : 'Novo',
-                info: client.email, // Using email as info for now
-                isVip: false, // Defaulting to false until we have VIP logic
-            }));
+            const formattedCustomers: Customer[] = (clients || []).map((client: any) => {
+                const isNew = new Date(client.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days
+                let computedStatus = client.status || 'active';
+
+                // Logic for "New" status label visualization (although stored as active)
+                if (computedStatus === 'active' && isNew) computedStatus = 'new';
+
+                return {
+                    id: client.id,
+                    name: client.full_name,
+                    image: `https://ui-avatars.com/api/?name=${client.full_name}&background=random`,
+                    pet: client.pets && client.pets[0] ? client.pets[0].name : 'Sem Pet',
+                    status: computedStatus,
+                    statusLabel: computedStatus === 'active' ? 'Ativo' : computedStatus === 'inactive' ? 'Cancelado' : computedStatus === 'new' ? 'Novo' : computedStatus,
+                    info: client.email,
+                    isVip: client.is_vip || false,
+                };
+            });
 
             setCustomers(formattedCustomers);
         } catch (error) {
@@ -205,29 +214,7 @@ const CustomerList: React.FC = () => {
                 })}
             </div>
 
-            {/* Bottom Navigation */}
-            <nav className="fixed bottom-0 z-40 w-full border-t border-border-light dark:border-white/5 bg-surface-light/90 dark:bg-background-dark/95 backdrop-blur-lg">
-                <div className="flex h-16 items-center justify-around px-2">
-                    <Link to="/admin" className="flex flex-1 flex-col items-center justify-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-2xl">grid_view</span>
-                        <span className="text-[10px] font-medium">Início</span>
-                    </Link>
-                    <Link to="/admin/orders" className="flex flex-1 flex-col items-center justify-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-2xl">package_2</span>
-                        <span className="text-[10px] font-medium">Pedidos</span>
-                    </Link>
-                    <Link to="/admin/customers" className="flex flex-1 flex-col items-center justify-center gap-1 text-primary">
-                        <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
-                        <span className="text-[10px] font-bold">Clientes</span>
-                    </Link>
-                    <Link to="/admin/settings" className="flex flex-1 flex-col items-center justify-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-2xl">settings</span>
-                        <span className="text-[10px] font-medium">Ajustes</span>
-                    </Link>
-                </div>
-                {/* iOS Home Indicator Safe Area */}
-                <div className="h-5 w-full bg-surface-light dark:bg-background-dark"></div>
-            </nav>
+            <AdminBottomNav />
         </div>
     );
 };

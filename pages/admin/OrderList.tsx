@@ -1,5 +1,8 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../src/lib/supabase';
+import AdminBottomNav from '../../components/admin/AdminBottomNav';
 
 // Filter options
 const FILTERS = ['Todos', 'Assinatura', 'Avulso', 'Pendente', 'Entregue'];
@@ -176,12 +179,12 @@ const OrderListNew: React.FC = () => {
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
-              className={`flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full px-5 transition-all active:scale-95 ${activeFilter === filter
+              className={`flex h - 9 shrink - 0 items - center justify - center gap - x - 2 rounded - full px - 5 transition - all active: scale - 95 ${activeFilter === filter
                   ? 'bg-primary shadow-md shadow-primary/10 text-white'
                   : 'bg-surface-light dark:bg-surface-dark border border-transparent hover:border-primary/30 text-text-main dark:text-white'
-                }`}
+                } `}
             >
-              <span className={`text-sm font-${activeFilter === filter ? 'bold' : 'medium'} leading-normal`}>
+              <span className={`text - sm font - ${activeFilter === filter ? 'bold' : 'medium'} leading - normal`}>
                 {filter}
               </span>
             </button>
@@ -221,13 +224,13 @@ const OrderListNew: React.FC = () => {
           return (
             <div
               key={order.id}
-              className={`group flex flex-col bg-surface-light dark:bg-surface-dark rounded-2xl p-4 border border-border-light dark:border-white/10 active:border-primary/50 transition-colors shadow-sm cursor-pointer ${order.status === 'shipped' ? 'opacity-80' : ''
-                }`}
-              onClick={() => navigate(`/admin/orders/${order.id}`)}
+              className={`group flex flex - col bg - surface - light dark: bg - surface - dark rounded - 2xl p - 4 border border - border - light dark: border - white / 10 active: border - primary / 50 transition - colors shadow - sm cursor - pointer ${order.status === 'shipped' ? 'opacity-80' : ''
+                } `}
+              onClick={() => navigate(`/ admin / orders / ${order.id} `)}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`bg-surface-light dark:bg-surface-dark p-2.5 rounded-xl ${order.iconColor} border border-border-light dark:border-white/5`}>
+                  <div className={`bg - surface - light dark: bg - surface - dark p - 2.5 rounded - xl ${order.iconColor} border border - border - light dark: border - white / 5`}>
                     <span className="material-symbols-outlined">{order.icon}</span>
                   </div>
                   <div>
@@ -241,7 +244,7 @@ const OrderListNew: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className={`${statusStyles.bg} ${statusStyles.text} text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1`}>
+                  <span className={`${statusStyles.bg} ${statusStyles.text} text - xs px - 2.5 py - 1 rounded - full font - bold flex items - center gap - 1`}>
                     {statusStyles.pulse && <span className="size-1.5 rounded-full bg-primary animate-pulse"></span>}
                     {statusStyles.icon && <span className="material-symbols-outlined text-[14px]">{statusStyles.icon}</span>}
                     {order.statusLabel}
@@ -250,7 +253,7 @@ const OrderListNew: React.FC = () => {
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-border-light dark:border-white/10">
                 <div className="flex items-center gap-2">
-                  <div className={`size-6 rounded-full bg-gradient-to-br ${order.customerGradient} flex items-center justify-center text-[10px] font-bold text-white`}>
+                  <div className={`size - 6 rounded - full bg - gradient - to - br ${order.customerGradient} flex items - center justify - center text - [10px] font - bold text - white`}>
                     {order.customerInitials}
                   </div>
                   <p className="text-sm text-text-secondary dark:text-gray-300">{order.customerName}</p>
@@ -268,26 +271,8 @@ const OrderListNew: React.FC = () => {
       </button>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-light/90 dark:bg-background-dark/95 backdrop-blur-lg border-t border-border-light dark:border-white/10 pb-6 pt-3 px-6">
-        <div className="flex justify-between items-center">
-          <Link to="/admin" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary hover:text-text-main dark:hover:text-white transition-colors">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-[10px] font-medium">Início</span>
-          </Link>
-          <Link to="/admin/orders" className="flex flex-col items-center gap-1 text-primary">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
-            <span className="text-[10px] font-bold">Pedidos</span>
-          </Link>
-          <Link to="/admin/pets" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary hover:text-text-main dark:hover:text-white transition-colors">
-            <span className="material-symbols-outlined">pets</span>
-            <span className="text-[10px] font-medium">Pets</span>
-          </Link>
-          <Link to="/admin/settings" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary hover:text-text-main dark:hover:text-white transition-colors">
-            <span className="material-symbols-outlined">settings</span>
-            <span className="text-[10px] font-medium">Ajustes</span>
-          </Link>
-        </div>
-      </nav>
+      {/* Bottom Navigation */}
+      <AdminBottomNav />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import AdminBottomNav from '../../components/admin/AdminBottomNav';
 import { Logo } from '../../components/Logo';
 
 // Stats data
@@ -38,6 +39,7 @@ const QUICK_ACCESS = [
     { icon: 'inventory_2', label: 'Pedidos', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400', link: '/admin/orders' },
     { icon: 'pets', label: 'Pets', iconBg: 'bg-purple-100 dark:bg-purple-900/30', iconColor: 'text-purple-600 dark:text-purple-400', link: '/admin/pets' },
     { icon: 'group', label: 'Clientes', iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400', link: '/admin/customers' },
+    { icon: 'shopping_bag', label: 'Produtos', iconBg: 'bg-pink-100 dark:bg-pink-900/30', iconColor: 'text-pink-600 dark:text-pink-400', link: '/admin/products' },
     { icon: 'handshake', label: 'Parcerias', iconBg: 'bg-amber-100 dark:bg-amber-900/30', iconColor: 'text-amber-600 dark:text-amber-400', link: '/admin/settings' },
     { icon: 'payments', label: 'Financeiro', iconBg: 'bg-cyan-100 dark:bg-cyan-900/30', iconColor: 'text-cyan-600 dark:text-cyan-400', link: '/admin/financial' },
 ];
@@ -177,28 +179,7 @@ const Dashboard: React.FC = () => {
             </main>
 
             {/* Bottom Navigation */}
-            <nav className="fixed bottom-0 left-0 right-0 z-30 bg-surface-light/90 dark:bg-background-dark/95 backdrop-blur-lg border-t border-border-light dark:border-white/5">
-                <div className="flex h-16 items-center justify-around px-2">
-                    <Link to="/admin" className="flex flex-col items-center justify-center gap-1 p-2 text-primary">
-                        <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-                        <span className="text-[10px] font-bold">Início</span>
-                    </Link>
-                    <Link to="/admin/pets" className="flex flex-col items-center justify-center gap-1 p-2 text-text-secondary hover:text-text-main dark:text-text-dark-secondary dark:hover:text-text-dark-main transition-colors">
-                        <span className="material-symbols-outlined">search</span>
-                        <span className="text-[10px] font-medium">Buscar</span>
-                    </Link>
-                    <Link to="/admin/orders" className="flex flex-col items-center justify-center gap-1 p-2 text-text-secondary hover:text-text-main dark:text-text-dark-secondary dark:hover:text-text-dark-main transition-colors">
-                        <span className="material-symbols-outlined">bar_chart</span>
-                        <span className="text-[10px] font-medium">Dados</span>
-                    </Link>
-                    <Link to="/admin/settings" className="flex flex-col items-center justify-center gap-1 p-2 text-text-secondary hover:text-text-main dark:text-text-dark-secondary dark:hover:text-text-dark-main transition-colors">
-                        <span className="material-symbols-outlined">settings</span>
-                        <span className="text-[10px] font-medium">Ajustes</span>
-                    </Link>
-                </div>
-                {/* Safe Area Spacer for iOS Home Indicator */}
-                <div className="h-[env(safe-area-inset-bottom)] w-full"></div>
-            </nav>
+            <AdminBottomNav />
         </div>
     );
 };

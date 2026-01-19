@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import ClientRegistrationModal from '../components/ClientRegistrationModal';
+import { supabase } from '../src/lib/supabase';
 
 // Types for type safety
 type PetSpecies = 'dog' | 'cat';
@@ -47,7 +49,91 @@ const MontarBox: React.FC = () => {
     });
 
     const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
-    const [cartCount] = useState(1);
+    const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<{ name: string; value: number; isSubscription: boolean; productId: string | null } | null>(null);
+    const navigate = useNavigate();
+
+    // Site config with product references
+    const [subscriptionConfig, setSubscriptionConfig] = useState({
+        product_id: null as string | null,
+        monthly_product_id: null as string | null,
+        annual_product_id: null as string | null,
+        display_name: 'Assinatura Box',
+        description: 'Todo mês uma surpresa nova!',
+        benefits: ['5 a 7 produtos premium', 'Personalizado para seu pet', 'Frete Grátis'],
+        original_price: 119.90,
+    });
+    const [onetimeConfig, setOnetimeConfig] = useState({
+        product_id: null as string | null,
+        display_name: 'Caixa Avulsa',
+        description: 'Para experimentar sem compromisso.',
+        benefits: ['Mesmos produtos da assinatura', 'Sem renovação automática'],
+    });
+    const [boxOfMonth, setBoxOfMonth] = useState<{ title: string; image_url: string | null }>({ title: 'Box do Mês', image_url: null });
+
+    // Products fetched from database (monthly and annual subscriptions)
+    const [monthlyProduct, setMonthlyProduct] = useState<{ id: string; price: number } | null>(null);
+    const [annualProduct, setAnnualProduct] = useState<{ id: string; price: number } | null>(null);
+    const [onetimeProduct, setOnetimeProduct] = useState<{ id: string; price: number } | null>(null);
+
+    // Coupon state
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_type: string; discount_value: number } | null>(null);
+    const [couponError, setCouponError] = useState<string | null>(null);
+    const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+    // Fetch site config and products
+    useEffect(() => {
+        const fetchConfig = async () => {
+            // Get site config
+            const { data: configData } = await supabase.from('site_config').select('*');
+
+            let monthlyProductId: string | null = null;
+            let annualProductId: string | null = null;
+            let oneProductId: string | null = null;
+
+            configData?.forEach((row: any) => {
+                if (row.id === 'subscription_product') {
+                    setSubscriptionConfig({
+                        product_id: row.value.product_id || null,
+                        monthly_product_id: row.value.monthly_product_id || row.value.product_id || null,
+                        annual_product_id: row.value.annual_product_id || null,
+                        display_name: row.value.display_name || row.value.name || 'Assinatura Box',
+                        description: row.value.description || '',
+                        benefits: row.value.benefits || [],
+                        original_price: row.value.original_price || 119.90,
+                    });
+                    monthlyProductId = row.value.monthly_product_id || row.value.product_id || null;
+                    annualProductId = row.value.annual_product_id || null;
+                } else if (row.id === 'onetime_product') {
+                    setOnetimeConfig({
+                        product_id: row.value.product_id || null,
+                        display_name: row.value.display_name || row.value.name || 'Caixa Avulsa',
+                        description: row.value.description || '',
+                        benefits: row.value.benefits || [],
+                    });
+                    oneProductId = row.value.product_id;
+                } else if (row.id === 'box_of_month') {
+                    setBoxOfMonth(row.value);
+                }
+            });
+
+            // Fetch actual product prices
+            if (monthlyProductId) {
+                const { data: prod } = await supabase.from('products').select('id, price').eq('id', monthlyProductId).single();
+                if (prod) setMonthlyProduct({ id: (prod as any).id, price: Number((prod as any).price) });
+            }
+            if (annualProductId) {
+                const { data: prod } = await supabase.from('products').select('id, price').eq('id', annualProductId).single();
+                if (prod) setAnnualProduct({ id: (prod as any).id, price: Number((prod as any).price) });
+            }
+            if (oneProductId) {
+                const { data: oneProd } = await supabase.from('products').select('id, price').eq('id', oneProductId).single();
+                if (oneProd) setOnetimeProduct({ id: (oneProd as any).id, price: Number((oneProd as any).price) });
+            }
+        };
+        fetchConfig();
+    }, []);
 
     // Handler for species selection
     const handleSpeciesChange = (species: PetSpecies) => {
@@ -88,7 +174,136 @@ const MontarBox: React.FC = () => {
         });
     };
 
-    const getPrice = () => billingPeriod === 'monthly' ? '89,90' : '69,90';
+    // Get subscription price based on billing period toggle
+    const getSubscriptionProduct = () => {
+        return billingPeriod === 'annual' ? annualProduct : monthlyProduct;
+    };
+
+    const getPrice = () => {
+        const product = getSubscriptionProduct();
+        const price = product?.price || 89.90;
+        return price.toFixed(2).replace('.', ',');
+    };
+    const getPriceValue = () => getSubscriptionProduct()?.price || 89.90;
+    const getOnetimePrice = () => onetimeProduct?.price || 109.90;
+
+    // Calculate discount
+    const calculateDiscount = (originalPrice: number) => {
+        if (!appliedCoupon) return 0;
+        if (appliedCoupon.discount_type === 'percentage') {
+            return (originalPrice * appliedCoupon.discount_value) / 100;
+        }
+        return Math.min(appliedCoupon.discount_value, originalPrice);
+    };
+
+    const getFinalPrice = (originalPrice: number) => {
+        return originalPrice - calculateDiscount(originalPrice);
+    };
+
+    // Validate coupon
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return;
+
+        setValidatingCoupon(true);
+        setCouponError(null);
+
+        const { data, error } = await supabase
+            .from('coupons')
+            .select('code, discount_type, discount_value, max_uses, uses_count, valid_until, active')
+            .eq('code', couponCode.toUpperCase().trim())
+            .single();
+
+        if (error || !data) {
+            setCouponError('Cupom não encontrado');
+            setAppliedCoupon(null);
+        } else {
+            const coupon = data as any;
+
+            if (!coupon.active) {
+                setCouponError('Cupom inativo');
+            } else if (coupon.valid_until && new Date(coupon.valid_until) < new Date()) {
+                setCouponError('Cupom expirado');
+            } else if (coupon.max_uses && coupon.uses_count >= coupon.max_uses) {
+                setCouponError('Cupom esgotado');
+            } else {
+                setAppliedCoupon({
+                    code: coupon.code,
+                    discount_type: coupon.discount_type,
+                    discount_value: coupon.discount_value,
+                });
+                setCouponError(null);
+            }
+        }
+
+        setValidatingCoupon(false);
+    };
+
+    const removeCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponCode('');
+        setCouponError(null);
+    };
+
+    const handleSubscribe = () => {
+        if (!formState.name.trim()) {
+            alert('Por favor, informe o nome do seu pet');
+            return;
+        }
+        setSelectedProduct({
+            name: `Assinatura Pet Box ${billingPeriod === 'monthly' ? 'Mensal' : 'Anual'}`,
+            value: getPriceValue(),
+            isSubscription: true,
+            productId: subscriptionConfig.product_id,
+        });
+        setShowRegistrationModal(true);
+    };
+
+    const handlePurchase = () => {
+        if (!formState.name.trim()) {
+            alert('Por favor, informe o nome do seu pet');
+            return;
+        }
+        setSelectedProduct({
+            name: 'Caixa Avulsa Pet Box',
+            value: getOnetimePrice(),
+            isSubscription: false,
+            productId: onetimeConfig.product_id,
+        });
+        setShowRegistrationModal(true);
+    };
+
+    const handleRegistrationSuccess = (clientData: {
+        clientId: string;
+        clientName: string;
+        clientEmail: string;
+        clientCpf: string;
+        clientPhone: string;
+        asaasCustomerId: string;
+        petId: string;
+    }) => {
+        setShowRegistrationModal(false);
+
+        // Navigate to checkout with full payment data
+        navigate('/checkout', {
+            state: {
+                clientId: clientData.clientId,
+                clientName: clientData.clientName,
+                clientEmail: clientData.clientEmail,
+                clientCpf: clientData.clientCpf,
+                clientPhone: clientData.clientPhone,
+                asaasCustomerId: clientData.asaasCustomerId,
+                petId: clientData.petId,
+                productType: selectedProduct?.isSubscription ? 'subscription' : 'one_time',
+                productName: selectedProduct?.name || '',
+                productValue: selectedProduct?.value || 0,
+                billingCycle: billingPeriod === 'annual' ? 'YEARLY' : 'MONTHLY',
+                couponId: appliedCoupon?.id,
+                discountAmount: appliedCoupon ? (appliedCoupon.discount_type === 'percentage'
+                    ? (selectedProduct?.value || 0) * (appliedCoupon.discount_value / 100)
+                    : appliedCoupon.discount_value) : 0,
+            }
+        });
+    };
 
     return (
         <div className="bg-background-light dark:bg-background-dark text-text-main-light dark:text-text-main-dark font-display antialiased overflow-x-hidden transition-colors duration-200 min-h-screen">
@@ -99,16 +314,7 @@ const MontarBox: React.FC = () => {
                         <span className="material-symbols-outlined text-text-main-light dark:text-text-main-dark">arrow_back</span>
                     </Link>
                     <h1 className="text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Pet Box</h1>
-                    <div className="flex w-10 items-center justify-end">
-                        <button className="relative flex cursor-pointer items-center justify-center text-text-main-light dark:text-text-main-dark transition-transform active:scale-95">
-                            <span className="material-symbols-outlined">shopping_bag</span>
-                            {cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-sm">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </button>
-                    </div>
+                    <div className="w-10" />
                 </div>
             </header>
 
@@ -157,14 +363,14 @@ const MontarBox: React.FC = () => {
                                     className="peer sr-only"
                                 />
                                 <div className={`mb-2 rounded-full p-3 transition-colors ${formState.species === 'dog'
-                                        ? 'bg-primary text-white'
-                                        : 'bg-primary/10 text-primary'
+                                    ? 'bg-primary text-white'
+                                    : 'bg-primary/10 text-primary'
                                     }`}>
                                     <span className="material-symbols-outlined text-3xl">pets</span>
                                 </div>
                                 <span className={`font-bold ${formState.species === 'dog'
-                                        ? 'text-primary'
-                                        : 'text-text-main-light dark:text-text-main-dark'
+                                    ? 'text-primary'
+                                    : 'text-text-main-light dark:text-text-main-dark'
                                     }`}>
                                     Cachorro
                                 </span>
@@ -185,14 +391,14 @@ const MontarBox: React.FC = () => {
                                     className="peer sr-only"
                                 />
                                 <div className={`mb-2 rounded-full p-3 transition-colors ${formState.species === 'cat'
-                                        ? 'bg-primary text-white'
-                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                                    ? 'bg-primary text-white'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                                     }`}>
                                     <span className="material-symbols-outlined text-3xl">cruelty_free</span>
                                 </div>
                                 <span className={`font-bold ${formState.species === 'cat'
-                                        ? 'text-primary'
-                                        : 'text-text-main-light dark:text-text-main-dark'
+                                    ? 'text-primary'
+                                    : 'text-text-main-light dark:text-text-main-dark'
                                     }`}>
                                     Gato
                                 </span>
@@ -242,8 +448,8 @@ const MontarBox: React.FC = () => {
                                             className="peer sr-only"
                                         />
                                         <div className={`flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-all ${formState.size === size
-                                                ? 'bg-primary text-white shadow-md'
-                                                : 'text-text-secondary-light dark:text-text-secondary-dark'
+                                            ? 'bg-primary text-white shadow-md'
+                                            : 'text-text-secondary-light dark:text-text-secondary-dark'
                                             }`}>
                                             {size === 'P' ? 'Pequeno' : size === 'M' ? 'Médio' : 'Grande'}
                                         </div>
@@ -269,8 +475,8 @@ const MontarBox: React.FC = () => {
                                         className="peer sr-only"
                                     />
                                     <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${formState.gender === 'boy'
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
+                                        ? 'border-primary bg-primary/10 text-primary'
+                                        : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
                                         }`}>
                                         <span className="material-symbols-outlined text-xl">male</span>
                                         <span className="text-sm font-medium">Macho</span>
@@ -288,8 +494,8 @@ const MontarBox: React.FC = () => {
                                         className="peer sr-only"
                                     />
                                     <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${formState.gender === 'girl'
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
+                                        ? 'border-primary bg-primary/10 text-primary'
+                                        : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
                                         }`}>
                                         <span className="material-symbols-outlined text-xl">female</span>
                                         <span className="text-sm font-medium">Fêmea</span>
@@ -315,8 +521,8 @@ const MontarBox: React.FC = () => {
                                                 className="peer sr-only"
                                             />
                                             <span className={`inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isSelected
-                                                    ? 'border-primary bg-primary text-white'
-                                                    : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
+                                                ? 'border-primary bg-primary text-white'
+                                                : 'border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark'
                                                 }`}>
                                                 {allergy}
                                             </span>
@@ -338,8 +544,8 @@ const MontarBox: React.FC = () => {
                             <button
                                 onClick={() => setBillingPeriod('monthly')}
                                 className={`text-xs font-bold px-2 py-1 rounded-md transition-all ${billingPeriod === 'monthly'
-                                        ? 'bg-white dark:bg-gray-700 shadow-sm text-text-main-light dark:text-text-main-dark'
-                                        : 'text-text-secondary-light dark:text-text-secondary-dark'
+                                    ? 'bg-white dark:bg-gray-700 shadow-sm text-text-main-light dark:text-text-main-dark'
+                                    : 'text-text-secondary-light dark:text-text-secondary-dark'
                                     }`}
                             >
                                 Mensal
@@ -347,12 +553,64 @@ const MontarBox: React.FC = () => {
                             <button
                                 onClick={() => setBillingPeriod('annual')}
                                 className={`text-xs font-medium px-2 py-1 rounded-md transition-all ${billingPeriod === 'annual'
-                                        ? 'bg-white dark:bg-gray-700 shadow-sm text-text-main-light dark:text-text-main-dark'
-                                        : 'text-text-secondary-light dark:text-text-secondary-dark'
+                                    ? 'bg-white dark:bg-gray-700 shadow-sm text-text-main-light dark:text-text-main-dark'
+                                    : 'text-text-secondary-light dark:text-text-secondary-dark'
                                     }`}
                             >
                                 Anual
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Coupon Input */}
+                    <div className="px-4 mb-4">
+                        <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-4 border border-border-light dark:border-white/10">
+                            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wide mb-2">
+                                <span className="material-symbols-outlined text-sm align-middle mr-1">confirmation_number</span>
+                                Cupom de Desconto
+                            </label>
+                            {appliedCoupon ? (
+                                <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
+                                        <span className="font-mono font-bold text-green-700 dark:text-green-300">{appliedCoupon.code}</span>
+                                        <span className="text-sm text-green-600 dark:text-green-400">
+                                            ({appliedCoupon.discount_type === 'percentage' ? `${appliedCoupon.discount_value}% off` : `R$ ${appliedCoupon.discount_value.toFixed(2).replace('.', ',')} off`})
+                                        </span>
+                                    </div>
+                                    <button onClick={removeCoupon} className="text-red-500 hover:text-red-700">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                                        placeholder="Digite seu cupom"
+                                        className="flex-1 h-10 px-3 rounded-lg bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white font-mono uppercase text-sm"
+                                    />
+                                    <button
+                                        onClick={handleApplyCoupon}
+                                        disabled={validatingCoupon || !couponCode.trim()}
+                                        className="px-4 bg-primary text-white font-bold rounded-lg disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        {validatingCoupon ? (
+                                            <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                                        ) : (
+                                            'Aplicar'
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                            {couponError && (
+                                <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-lg">error</span>
+                                    {couponError}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -365,36 +623,33 @@ const MontarBox: React.FC = () => {
                             <div className="rounded-xl bg-white dark:bg-surface-dark p-5 h-full flex flex-col">
                                 <div className="flex items-start justify-between mb-2">
                                     <div>
-                                        <h4 className="text-lg font-bold text-text-main-light dark:text-text-main-dark">Assinatura Box</h4>
-                                        <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">Todo mês uma surpresa nova!</p>
+                                        <h4 className="text-lg font-bold text-text-main-light dark:text-text-main-dark">{subscriptionConfig.display_name}</h4>
+                                        <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">{subscriptionConfig.description}</p>
                                     </div>
                                     <div className="bg-primary/10 rounded-lg p-2">
                                         <span className="material-symbols-outlined text-primary">redeem</span>
                                     </div>
                                 </div>
                                 <div className="my-4 space-y-2">
-                                    <div className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
-                                        <span className="material-symbols-outlined text-green-500 text-lg">check</span>
-                                        <span>5 a 7 produtos premium</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
-                                        <span className="material-symbols-outlined text-green-500 text-lg">check</span>
-                                        <span>Personalizado para seu pet</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
-                                        <span className="material-symbols-outlined text-green-500 text-lg">check</span>
-                                        <span>Frete Grátis</span>
-                                    </div>
+                                    {subscriptionConfig.benefits.map((benefit, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
+                                            <span className="material-symbols-outlined text-green-500 text-lg">check</span>
+                                            <span>{benefit}</span>
+                                        </div>
+                                    ))}
                                 </div>
                                 <div className="mt-auto pt-4 border-t border-dashed border-border-light dark:border-border-dark flex items-end justify-between">
                                     <div>
-                                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark line-through">R$ 119,90</p>
+                                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark line-through">R$ {subscriptionConfig.original_price.toFixed(2).replace('.', ',')}</p>
                                         <div className="flex items-baseline gap-1">
                                             <span className="text-2xl font-bold text-primary">R$ {getPrice()}</span>
                                             <span className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">/mês</span>
                                         </div>
                                     </div>
-                                    <button className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors text-sm">
+                                    <button
+                                        onClick={handleSubscribe}
+                                        className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors text-sm"
+                                    >
                                         Assinar
                                     </button>
                                 </div>
@@ -405,31 +660,32 @@ const MontarBox: React.FC = () => {
                         <div className="relative overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-5 shadow-sm">
                             <div className="flex items-start justify-between mb-2">
                                 <div>
-                                    <h4 className="text-lg font-bold text-text-main-light dark:text-text-main-dark">Caixa Avulsa</h4>
-                                    <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">Para experimentar sem compromisso.</p>
+                                    <h4 className="text-lg font-bold text-text-main-light dark:text-text-main-dark">{onetimeConfig.display_name}</h4>
+                                    <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">{onetimeConfig.description}</p>
                                 </div>
                                 <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
                                     <span className="material-symbols-outlined text-text-secondary-light dark:text-text-secondary-dark">inventory_2</span>
                                 </div>
                             </div>
                             <div className="my-4 space-y-2 opacity-80">
-                                <div className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
-                                    <span className="material-symbols-outlined text-text-secondary-light dark:text-text-secondary-dark text-lg">check</span>
-                                    <span>Mesmos produtos da assinatura</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
-                                    <span className="material-symbols-outlined text-text-secondary-light dark:text-text-secondary-dark text-lg">check</span>
-                                    <span>Sem renovação automática</span>
-                                </div>
+                                {onetimeConfig.benefits.map((benefit, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 text-sm text-text-main-light dark:text-text-main-dark">
+                                        <span className="material-symbols-outlined text-text-secondary-light dark:text-text-secondary-dark text-lg">check</span>
+                                        <span>{benefit}</span>
+                                    </div>
+                                ))}
                             </div>
                             <div className="mt-auto pt-4 border-t border-border-light dark:border-border-dark flex items-end justify-between">
                                 <div>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold text-text-main-light dark:text-text-main-dark">R$ 109,90</span>
+                                        <span className="text-xl font-bold text-text-main-light dark:text-text-main-dark">R$ {getOnetimePrice().toFixed(2).replace('.', ',')}</span>
                                         <span className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">/uma vez</span>
                                     </div>
                                 </div>
-                                <button className="bg-surface-light dark:bg-surface-dark border-2 border-primary text-primary hover:bg-primary hover:text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
+                                <button
+                                    onClick={handlePurchase}
+                                    className="bg-surface-light dark:bg-surface-dark border-2 border-primary text-primary hover:bg-primary hover:text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                                >
                                     Comprar
                                 </button>
                             </div>
@@ -460,22 +716,22 @@ const MontarBox: React.FC = () => {
                 </section>
             </main>
 
-            {/* Sticky Bottom CTA */}
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-light dark:bg-surface-dark border-t border-border-light dark:border-border-dark p-4 pb-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                <div className="max-w-md mx-auto flex gap-3">
-                    <div className="flex-1">
-                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">Total estimado</p>
-                        <p className="text-xl font-bold text-text-main-light dark:text-text-main-dark">
-                            R$ {getPrice()}
-                            <span className="text-sm font-normal text-text-secondary-light dark:text-text-secondary-dark">/mês</span>
-                        </p>
-                    </div>
-                    <button className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 h-12">
-                        <span>Finalizar</span>
-                        <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-                    </button>
-                </div>
-            </div>
+            {/* Client Registration Modal */}
+            {selectedProduct && (
+                <ClientRegistrationModal
+                    isOpen={showRegistrationModal}
+                    onClose={() => setShowRegistrationModal(false)}
+                    onSuccess={handleRegistrationSuccess}
+                    petData={{
+                        name: formState.name,
+                        type: formState.species,
+                        size: formState.size,
+                        gender: formState.gender,
+                        allergies: formState.allergies,
+                    }}
+                    productInfo={selectedProduct}
+                />
+            )}
         </div>
     );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../src/lib/supabase';
+import AdminBottomNav from '../../components/admin/AdminBottomNav';
 
 // Filter options
 const FILTERS = ['Todos', 'Assinantes', 'Avulsos', 'Inativos', '🐕 Cães', '🐈 Gatos'];
@@ -211,27 +212,7 @@ const PetListNew: React.FC = () => {
         ))}
       </div>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-light/90 dark:bg-background-dark/95 backdrop-blur-lg border-t border-border-light dark:border-white/5 pt-2 pb-6 px-6">
-        <div className="flex justify-between items-center">
-          <Link to="/admin" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-            <span className="material-symbols-outlined text-2xl">dashboard</span>
-            <span className="text-[10px] font-medium">Início</span>
-          </Link>
-          <Link to="/admin/pets" className="flex flex-col items-center gap-1 text-primary">
-            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>pets</span>
-            <span className="text-[10px] font-bold">Pets</span>
-          </Link>
-          <Link to="/admin/orders" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-            <span className="material-symbols-outlined text-2xl">package_2</span>
-            <span className="text-[10px] font-medium">Box</span>
-          </Link>
-          <Link to="/admin/settings" className="flex flex-col items-center gap-1 text-text-secondary dark:text-text-dark-secondary/50 hover:text-primary dark:hover:text-primary transition-colors">
-            <span className="material-symbols-outlined text-2xl">person</span>
-            <span className="text-[10px] font-medium">Perfil</span>
-          </Link>
-        </div>
-      </nav>
+      <AdminBottomNav />
 
       {/* Gradient Overlay */}
       <div className="fixed bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none z-10"></div>

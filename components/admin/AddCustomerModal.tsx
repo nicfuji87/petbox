@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../src/lib/supabase';
+import { formatCPF, formatPhone, unformat } from '../../src/utils/formatters';
 
 interface AddCustomerModalProps {
     isOpen: boolean;
@@ -15,12 +16,52 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
         cpf: '',
         phone: ''
     });
-    const [errors, setErrors] = useState<any>(null);
+    const [addressData, setAddressData] = useState({
+        zip_code: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: ''
+    });
+    const [errors, setErrors] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setAddressData({ ...addressData, [e.target.name]: e.target.value });
+    };
+
+    const handleZipCodeBlur = async () => {
+        const cep = addressData.zip_code.replace(/\D/g, '');
+        if (cep.length !== 8) return;
+
+        try {
+            const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const data = await response.json();
+
+            if (data.erro) {
+                setErrors('CEP não encontrado.');
+                return;
+            }
+
+            setAddressData(prev => ({
+                ...prev,
+                street: data.logradouro,
+                neighborhood: data.bairro,
+                city: data.localidade,
+                state: data.uf
+            }));
+            setErrors(null);
+        } catch (error) {
+            console.error('Error fetching CEP:', error);
+            setErrors('Erro ao buscar CEP.');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -29,62 +70,57 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
         setErrors(null);
 
         try {
-            // 1. Create locally first to get an ID (or use temporary ID)
-            // Actually, let's call the Edge Function directly. 
-            // We'll generate a UUID on the client or let the Edge Function generate/insert?
-            // Plan says: Edge -> Asaas -> DB. So Edge Function handles insertion.
-            // We need a temporary UUID for the Edge Function usage? 
-            // No, Edge function logic: "Insert Client (with asaas_id)".
-            // So we pass data to Edge Function.
-
-            const { data, error } = await supabase.functions.invoke('manage-clients', {
-                body: {
-                    action: 'create',
-                    clientData: {
-                        ...formData,
-                        // Pass a temp ID if needed for external ref, or let DB generate.
-                        // My edge function logic used "clientData.id" to update. 
-                        // Let's change the edge function logic slightly or Insert first in DB here?
-                        // Strategy: Insert in DB as PENDING/Processing -> Call Edge -> Update.
-                        // This is safer.
-                    }
-                }
-            });
-
-            // BETTER STRATEGY following Architecture Plan:
-            // User -> Edge -> Asaas -> Return ID -> Edge -> DB Insert.
-
-            // Wait, my deployed Edge Function tries to UPDATE an existing client with ID.
-            // Let's adjust approach: 
-            // 1. Insert into Supabase (status: pending_asaas).
-            // 2. Call Edge Function with that ID.
-            // 3. Edge Function calls Asaas, gets ID, updates Supabase.
+            // 1. Insert client into Supabase
+            const cleanData = {
+                ...formData,
+                cpf: unformat(formData.cpf),
+                phone: unformat(formData.phone)
+            };
 
             const { data: insertData, error: insertError } = await supabase
                 .from('clients')
-                .insert([{ ...formData }] as any)
+                .insert([cleanData] as any)
                 .select()
                 .single();
 
             if (insertError) throw insertError;
 
-            // Call Edge Function to Sync
+            // 2. Insert address if CEP was provided
+            if (addressData.zip_code) {
+                const { error: addrError } = await supabase
+                    .from('addresses')
+                    .insert([{
+                        ...addressData,
+                        client_id: insertData.id
+                    }] as any);
+
+                if (addrError) console.error('Address insert error:', addrError);
+            }
+
+            // 3. Call Edge Function to Sync with Asaas (includes notificationDisabled: true)
             const { error: fnError } = await supabase.functions.invoke('manage-clients', {
                 body: {
                     action: 'create',
-                    clientData: insertData
+                    clientData: {
+                        ...insertData,
+                        address: addressData.street,
+                        addressNumber: addressData.number,
+                        complement: addressData.complement,
+                        province: addressData.neighborhood,
+                        postalCode: addressData.zip_code
+                    }
                 }
             });
 
             if (fnError) {
                 console.error('Edge Function Error', fnError);
-                // Don't block UI success if DB insert worked, but warn?
-                // Or show error?
-                // Let's assume for now we just want to create the record.
             }
 
             onSuccess();
             onClose();
+            // Reset form
+            setFormData({ full_name: '', email: '', cpf: '', phone: '' });
+            setAddressData({ zip_code: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '' });
         } catch (err: any) {
             setErrors(err.message || 'Erro ao criar cliente');
         } finally {
@@ -94,45 +130,134 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md bg-surface-light dark:bg-background-dark rounded-3xl shadow-2xl overflow-hidden border border-border-light dark:border-white/10">
-                <div className="px-6 py-4 border-b border-border-light dark:border-white/10 flex justify-between items-center bg-surface-light dark:bg-surface-dark">
+            <div className="w-full max-w-lg bg-surface-light dark:bg-background-dark rounded-3xl shadow-2xl overflow-hidden border border-border-light dark:border-white/10 max-h-[90vh] overflow-y-auto">
+                <div className="px-6 py-4 border-b border-border-light dark:border-white/10 flex justify-between items-center bg-surface-light dark:bg-surface-dark sticky top-0 z-10">
                     <h2 className="text-lg font-bold text-text-main dark:text-white">Novo Cliente</h2>
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-text-secondary">
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Nome Completo</label>
-                        <input
-                            name="full_name" value={formData.full_name} onChange={handleChange} required
-                            className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Email</label>
-                        <input
-                            name="email" type="email" value={formData.email} onChange={handleChange} required
-                            className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                    {/* Personal Info Section */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold text-primary uppercase tracking-wider">Dados Pessoais</h3>
                         <div>
-                            <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">CPF</label>
+                            <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Nome Completo</label>
                             <input
-                                name="cpf" value={formData.cpf} onChange={handleChange} required
-                                placeholder="000.000.000-00"
+                                name="full_name" value={formData.full_name} onChange={handleChange} required
                                 className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Celular</label>
+                            <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Email</label>
                             <input
-                                name="phone" value={formData.phone} onChange={handleChange} required
-                                placeholder="(00) 00000-0000"
+                                name="email" type="email" value={formData.email} onChange={handleChange} required
                                 className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
                             />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">CPF</label>
+                                <input
+                                    name="cpf"
+                                    value={formData.cpf}
+                                    onChange={(e) => {
+                                        const formatted = formatCPF(e.target.value);
+                                        setFormData({ ...formData, cpf: formatted });
+                                    }}
+                                    required
+                                    placeholder="000.000.000-00"
+                                    maxLength={14}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Celular</label>
+                                <input
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={(e) => {
+                                        const formatted = formatPhone(e.target.value);
+                                        setFormData({ ...formData, phone: formatted });
+                                    }}
+                                    required
+                                    placeholder="(00) 00000-0000"
+                                    maxLength={15}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Address Section */}
+                    <div className="space-y-4 pt-2">
+                        <h3 className="text-xs font-bold text-primary uppercase tracking-wider">Endereço (Opcional)</h3>
+
+                        {/* CEP First */}
+                        <div className="bg-primary/5 dark:bg-primary/10 p-3 rounded-xl border border-primary/20">
+                            <label className="block text-xs font-bold text-primary mb-1">CEP (preenche automaticamente)</label>
+                            <input
+                                name="zip_code"
+                                value={addressData.zip_code}
+                                onChange={handleAddressChange}
+                                onBlur={handleZipCodeBlur}
+                                placeholder="00000-000"
+                                className="w-full h-11 px-3 rounded-xl bg-white dark:bg-black/20 border border-primary/30 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3">
+                            <div className="col-span-3">
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Rua</label>
+                                <input
+                                    name="street" value={addressData.street} onChange={handleAddressChange}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Nº</label>
+                                <input
+                                    name="number" value={addressData.number} onChange={handleAddressChange}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Complemento</label>
+                                <input
+                                    name="complement" value={addressData.complement} onChange={handleAddressChange}
+                                    placeholder="Apto, Bloco..."
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Bairro</label>
+                                <input
+                                    name="neighborhood" value={addressData.neighborhood} onChange={handleAddressChange}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3">
+                            <div className="col-span-3">
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">Cidade</label>
+                                <input
+                                    name="city" value={addressData.city} onChange={handleAddressChange}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-text-secondary dark:text-text-dark-secondary mb-1">UF</label>
+                                <input
+                                    name="state" value={addressData.state} onChange={handleAddressChange}
+                                    maxLength={2}
+                                    className="w-full h-11 px-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white uppercase"
+                                />
+                            </div>
                         </div>
                     </div>
 

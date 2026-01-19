@@ -114,12 +114,7 @@ const Home: React.FC = () => {
       {/* Sticky Navigation Bar */}
       <header className="sticky top-0 z-50 flex items-center bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md p-4 pb-2 justify-between border-b border-black/5 dark:border-white/5">
         <Logo />
-        <div className="flex items-center justify-end gap-3">
-
-          <button className="flex items-center justify-center rounded-full size-10 bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-dark-main shadow-sm">
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-        </div>
+        <div className="w-10" />
       </header>
 
       {/* Hero Section */}
