@@ -149,7 +149,7 @@ const CouponList: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
+        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-32">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-white/10">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">

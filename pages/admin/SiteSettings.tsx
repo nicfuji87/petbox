@@ -29,6 +29,12 @@ interface BoxOfMonth {
     image_url: string | null;
 }
 
+interface LandingVideoConfig {
+    video_url: string | null;
+    username: string;
+    description: string;
+}
+
 const SiteSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -63,7 +69,15 @@ const SiteSettings: React.FC = () => {
         image_url: null,
     });
 
+    const [landingVideo, setLandingVideo] = useState<LandingVideoConfig>({
+        video_url: null,
+        username: '@petbox',
+        description: 'A reação do Thor recebendo a caixa desse mês é impagável! 🧡 📦 #petbox #felicidade',
+    });
+
     const [newBenefit, setNewBenefit] = useState({ subscription: '', onetime: '' });
+    const videoInputRef = useRef<HTMLInputElement>(null);
+    const [uploadingVideo, setUploadingVideo] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -112,6 +126,12 @@ const SiteSettings: React.FC = () => {
                 });
             } else if (row.id === 'box_of_month') {
                 setBoxOfMonth(row.value);
+            } else if (row.id === 'landing_video') {
+                setLandingVideo({
+                    video_url: row.value.video_url || null,
+                    username: row.value.username || '@petbox',
+                    description: row.value.description || '',
+                });
             }
         });
 
@@ -128,6 +148,7 @@ const SiteSettings: React.FC = () => {
                 { id: 'subscription_product', value: subscriptionConfig, updated_at: new Date().toISOString() },
                 { id: 'onetime_product', value: onetimeConfig, updated_at: new Date().toISOString() },
                 { id: 'box_of_month', value: boxOfMonth, updated_at: new Date().toISOString() },
+                { id: 'landing_video', value: landingVideo, updated_at: new Date().toISOString() },
             ] as any);
 
             setSuccess(true);
@@ -214,7 +235,7 @@ const SiteSettings: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background-light dark:bg-background-dark">
+        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-32">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-white/10">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -308,6 +329,113 @@ const SiteSettings: React.FC = () => {
                                     src={boxOfMonth.image_url}
                                     alt="Box do Mês"
                                     className="h-48 w-auto rounded-xl object-cover border border-border-light dark:border-white/10"
+                                />
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Landing Page Video */}
+                <section className="bg-surface-light dark:bg-surface-dark rounded-2xl p-6 border border-border-light dark:border-white/10">
+                    <h2 className="text-lg font-bold text-text-main dark:text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">videocam</span>
+                        Vídeo da Landing Page
+                    </h2>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wide mb-2">
+                                Upload de Vídeo (MP4)
+                            </label>
+                            <input
+                                ref={videoInputRef}
+                                type="file"
+                                accept="video/mp4"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (file.size > 50 * 1024 * 1024) {
+                                        setError('O vídeo deve ter no máximo 50MB');
+                                        return;
+                                    }
+                                    setUploadingVideo(true);
+                                    setError(null);
+                                    try {
+                                        const fileName = `landing-video-${Date.now()}.mp4`;
+                                        const { error: uploadError } = await supabase.storage
+                                            .from('site-assets')
+                                            .upload(fileName, file, { contentType: 'video/mp4', upsert: true });
+                                        if (uploadError) throw uploadError;
+                                        const { data: urlData } = supabase.storage
+                                            .from('site-assets')
+                                            .getPublicUrl(fileName);
+                                        setLandingVideo({ ...landingVideo, video_url: urlData.publicUrl });
+                                    } catch (err: any) {
+                                        setError(err.message || 'Erro ao enviar vídeo');
+                                    } finally {
+                                        setUploadingVideo(false);
+                                    }
+                                }}
+                            />
+                            <button
+                                onClick={() => videoInputRef.current?.click()}
+                                disabled={uploadingVideo}
+                                className="w-full h-11 px-4 rounded-xl border-2 border-dashed border-border-light dark:border-white/20 text-text-secondary hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
+                            >
+                                {uploadingVideo ? (
+                                    <>
+                                        <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                        Enviando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-symbols-outlined">upload</span>
+                                        {landingVideo.video_url ? 'Trocar Vídeo' : 'Fazer Upload'}
+                                    </>
+                                )}
+                            </button>
+                            {landingVideo.video_url && (
+                                <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                                    Vídeo configurado
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wide mb-2">
+                                @Username
+                            </label>
+                            <input
+                                type="text"
+                                value={landingVideo.username}
+                                onChange={(e) => setLandingVideo({ ...landingVideo, username: e.target.value })}
+                                placeholder="@petbox"
+                                className="w-full h-11 px-4 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wide mb-2">
+                                Descrição do Vídeo
+                            </label>
+                            <textarea
+                                value={landingVideo.description}
+                                onChange={(e) => setLandingVideo({ ...landingVideo, description: e.target.value })}
+                                placeholder="A reação do Thor recebendo a caixa..."
+                                rows={2}
+                                className="w-full px-4 py-3 rounded-xl bg-background-light dark:bg-black/20 border border-border-light dark:border-white/10 focus:border-primary focus:outline-none text-text-main dark:text-white resize-none"
+                            />
+                        </div>
+
+                        {landingVideo.video_url && (
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-text-secondary mb-2">Preview:</p>
+                                <video
+                                    src={landingVideo.video_url}
+                                    controls
+                                    className="h-48 w-auto rounded-xl border border-border-light dark:border-white/10"
                                 />
                             </div>
                         )}

@@ -78,7 +78,7 @@ const Dashboard: React.FC = () => {
     const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col pb-24 overflow-x-hidden">
+        <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden pb-32 bg-background-light dark:bg-background-dark">
             {/* Top App Bar */}
             <header className="sticky top-0 z-20 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-border-light dark:border-white/5 px-4 py-3">
                 <div className="flex items-center justify-between">

@@ -38,7 +38,7 @@ const Financial: React.FC = () => {
     const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
 
     return (
-        <div className="relative min-h-screen flex flex-col w-full overflow-x-hidden bg-background-light dark:bg-background-dark pb-24">
+        <div className="relative min-h-screen flex flex-col w-full overflow-x-hidden bg-background-light dark:bg-background-dark pb-32">
             {/* Header */}
             <header className="sticky top-0 z-20 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-5 pt-12 pb-4 flex items-center justify-between border-b border-black/5 dark:border-white/5">
                 <div className="flex items-center gap-3">
@@ -250,8 +250,8 @@ const Financial: React.FC = () => {
                                 <div className="flex items-center gap-3.5">
                                     <div
                                         className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${transaction.type === 'income'
-                                                ? 'bg-primary/10 text-primary'
-                                                : 'bg-black/5 dark:bg-white/5 text-text-secondary dark:text-text-dark-secondary'
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'bg-black/5 dark:bg-white/5 text-text-secondary dark:text-text-dark-secondary'
                                             }`}
                                     >
                                         <span className="material-symbols-outlined text-xl">{transaction.icon}</span>

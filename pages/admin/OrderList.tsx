@@ -138,7 +138,7 @@ const OrderListNew: React.FC = () => {
   });
 
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden pb-20 bg-background-light dark:bg-background-dark">
+    <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden pb-32 bg-background-light dark:bg-background-dark">
       {/* Sticky Header Section */}
       <div className="sticky top-0 z-30 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-white/10 shadow-sm">
         {/* Top App Bar */}
@@ -180,8 +180,8 @@ const OrderListNew: React.FC = () => {
               key={filter}
               onClick={() => setActiveFilter(filter)}
               className={`flex h - 9 shrink - 0 items - center justify - center gap - x - 2 rounded - full px - 5 transition - all active: scale - 95 ${activeFilter === filter
-                  ? 'bg-primary shadow-md shadow-primary/10 text-white'
-                  : 'bg-surface-light dark:bg-surface-dark border border-transparent hover:border-primary/30 text-text-main dark:text-white'
+                ? 'bg-primary shadow-md shadow-primary/10 text-white'
+                : 'bg-surface-light dark:bg-surface-dark border border-transparent hover:border-primary/30 text-text-main dark:text-white'
                 } `}
             >
               <span className={`text - sm font - ${activeFilter === filter ? 'bold' : 'medium'} leading - normal`}>

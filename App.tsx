@@ -20,17 +20,10 @@ import NotificationSettings from './pages/admin/NotificationSettings';
 import Financial from './pages/admin/Financial';
 import Settings from './pages/admin/Settings';
 import Login from './pages/Login';
-import { BottomNav } from './components/BottomNav';
-
 const LayoutWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const location = useLocation();
-  const isAdmin = location.pathname.startsWith('/admin');
-
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark text-text-main dark:text-text-dark-main">
       {children}
-      {/* BottomNav only for non-admin routes (e.g. customer-facing pages) */}
-      {!isAdmin && <BottomNav />}
     </div>
   );
 };

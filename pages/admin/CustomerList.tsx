@@ -102,7 +102,7 @@ const CustomerList: React.FC = () => {
     });
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col overflow-hidden mx-auto bg-background-light dark:bg-background-dark">
+        <div className="relative flex min-h-screen w-full flex-col overflow-hidden mx-auto bg-background-light dark:bg-background-dark pb-32">
             {/* Top App Bar */}
             <header className="sticky top-0 z-30 flex items-center justify-between p-4 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-white/5">
                 <div className="flex flex-col">

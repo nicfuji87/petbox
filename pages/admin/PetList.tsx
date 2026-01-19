@@ -111,7 +111,7 @@ const PetListNew: React.FC = () => {
   });
 
   return (
-    <div className="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col pb-20">
+    <div className="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col pb-32">
       {/* Top App Bar */}
       <div className="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-white/5 px-4 pt-12 pb-4 flex items-center justify-between">
         <div>
@@ -212,10 +212,6 @@ const PetListNew: React.FC = () => {
         ))}
       </div>
 
-      <AdminBottomNav />
-
-      {/* Gradient Overlay */}
-      <div className="fixed bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none z-10"></div>
     </div>
   );
 };

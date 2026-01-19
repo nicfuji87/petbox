@@ -7,7 +7,7 @@ const Settings: React.FC = () => {
     const [showBreedsModal, setShowBreedsModal] = useState(false);
 
     return (
-        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
+        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-32">
             <div className="p-6">
                 <h1 className="text-2xl font-bold text-text-main dark:text-white mb-6">Ajustes</h1>
 

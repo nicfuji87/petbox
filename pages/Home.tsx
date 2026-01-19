@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Logo } from '../components/Logo';
-import petboxVideo from '../assets/videos/petbox_video_1.mp4';
+import { supabase } from '../src/lib/supabase';
+import petboxVideoFallback from '../assets/videos/petbox_video_1.mp4';
 
 // Testimonials data
 const TESTIMONIALS = [
@@ -89,6 +90,29 @@ const StarRating: React.FC<{ rating: number }> = ({ rating }) => (
 const Home: React.FC = () => {
   const [showFab, setShowFab] = useState(false);
   const footerRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoConfig, setVideoConfig] = useState({
+    video_url: null as string | null,
+    username: '@petbox',
+    description: 'A reação do Thor recebendo a caixa desse mês é impagável! 🧡 📦 #petbox #felicidade',
+  });
+
+  // Fetch video config
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data } = await supabase.from('site_config').select('*').eq('id', 'landing_video').single();
+      if (data?.value) {
+        const config = (data as any).value;
+        setVideoConfig({
+          video_url: config.video_url || null,
+          username: config.username || '@petbox',
+          description: config.description || '',
+        });
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -170,24 +194,41 @@ const Home: React.FC = () => {
             <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-black/40 to-transparent z-20 pointer-events-none"></div>
 
             <video
-              src={petboxVideo}
+              ref={videoRef}
+              src={videoConfig.video_url || petboxVideoFallback}
               controls
               loop
               playsInline
               poster="https://images.unsplash.com/photo-1548681528-6a5c45b6c342?q=80&w=1974&auto=format&fit=crop"
               className="absolute inset-0 w-full h-full object-cover"
+              onPlay={() => setIsVideoPlaying(true)}
+              onPause={() => setIsVideoPlaying(false)}
             />
 
-            {/* Reels UI Elements Mockup */}
-            <div className="absolute bottom-16 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white z-10 pointer-events-none">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="size-8 rounded-full bg-primary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-sm">pets</span>
+            {/* Play Overlay */}
+            {!isVideoPlaying && (
+              <div
+                className="absolute inset-0 flex items-center justify-center z-5 cursor-pointer bg-black/30"
+                onClick={() => videoRef.current?.play()}
+              >
+                <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="material-symbols-outlined text-4xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 </div>
-                <span className="font-bold text-sm">@petbox</span>
               </div>
-              <p className="text-sm font-medium leading-snug mb-2">A reação do Thor recebendo a caixa desse mês é impagável! 🧡 📦 #petbox #felicidade</p>
-            </div>
+            )}
+
+            {/* Reels UI Elements Mockup - Hidden when video is playing */}
+            {!isVideoPlaying && (
+              <div className="absolute bottom-16 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white z-10 pointer-events-none transition-opacity duration-300">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="size-8 rounded-full bg-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-sm">pets</span>
+                  </div>
+                  <span className="font-bold text-sm">{videoConfig.username}</span>
+                </div>
+                <p className="text-sm font-medium leading-snug mb-2">{videoConfig.description}</p>
+              </div>
+            )}
           </div>
 
           {/* Steps List */}
